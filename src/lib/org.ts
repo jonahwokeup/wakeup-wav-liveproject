@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
 
 export type OrgRecord = { id: string; name: string; type: 'artist'|'label' };
+type MembershipWithOrg = { organizations: OrgRecord };
 
 export async function getActiveOrg(): Promise<OrgRecord | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -8,11 +9,12 @@ export async function getActiveOrg(): Promise<OrgRecord | null> {
 
   const { data, error } = await supabase
     .from('memberships')
-    .select('org_id, organizations!inner(id, name, type)')
+    .select('organizations(id, name, type)')
     .eq('user_id', user.id)
     .limit(1);
 
   if (error || !data || data.length === 0) return null;
-  const org = (data[0] as any).organizations as OrgRecord;
-  return org ?? null;
+
+  const rows = data as MembershipWithOrg[];
+  return rows[0]?.organizations ?? null;
 }

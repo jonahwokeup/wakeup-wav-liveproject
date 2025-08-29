@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
 import { getActiveOrg } from '@/lib/org';
-import { Card, CardTitle, CardText } from '@/components/ui/Card';
+import { Card, CardTitle } from '@/components/ui/Card';
 
 type ReleaseType = 'single' | 'ep' | 'album';
 

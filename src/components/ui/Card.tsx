@@ -8,10 +8,10 @@ export function Card({ className = '', children }: React.PropsWithChildren<{ cla
   );
 }
 
-export function CardTitle({ children }: React.PropsWithChildren) {
-  return <h3 className="text-lg font-semibold">{children}</h3>;
+export function CardTitle({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
+  return <h3 className={`text-lg font-semibold ${className}`}>{children}</h3>;
 }
 
-export function CardText({ children }: React.PropsWithChildren) {
-  return <p className="text-sm text-zinc-400">{children}</p>;
+export function CardText({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
+  return <p className={`text-sm text-zinc-400 ${className}`}>{children}</p>;
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -13,7 +13,10 @@ function parseHashParams(hash: string) {
   };
 }
 
-export default function AuthCallback() {
+// Prevent prerendering issues for this page
+export const dynamic = 'force-dynamic';
+
+function CallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -29,14 +32,16 @@ export default function AuthCallback() {
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (!error) return router.replace('/org/new');
+          // fall through if error
         }
 
-        // 2) Magic link (?token_hash=&type=magiclink|recovery|invite)
+        // 2) Magic link (?token_hash=&type=...)
         const token_hash = searchParams.get('token_hash');
-        const type = searchParams.get('type');
+        const type = searchParams.get('type') as OtpType | null;
         if (token_hash && type) {
-          const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as OtpType });
+          const { error } = await supabase.auth.verifyOtp({ token_hash, type });
           if (!error) return router.replace('/org/new');
+          // fall through if error
         }
 
         // 3) Hash fragment (#access_token=&refresh_token=)
@@ -44,14 +49,24 @@ export default function AuthCallback() {
         if (access_token && refresh_token) {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (!error) return router.replace('/org/new');
+          // fall through if error
         }
 
+        // If none worked, go back to signin
         router.replace('/signin?error=auth');
       } catch {
-        router.replace('/signin?error=auth');
+        router.replace('/signin?error/auth');
       }
     })();
   }, [router, searchParams]);
 
   return <p className="p-6">Signing you in…</p>;
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={<p className="p-6">Signing you in…</p>}>
+      <CallbackInner />
+    </Suspense>
+  );
 }

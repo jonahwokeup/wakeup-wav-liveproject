@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
+type OtpType = 'magiclink' | 'recovery' | 'invite' | 'email_change';
+
 function parseHashParams(hash: string) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   return {
@@ -33,7 +35,7 @@ export default function AuthCallback() {
         const token_hash = searchParams.get('token_hash');
         const type = searchParams.get('type');
         if (token_hash && type) {
-          const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as any });
+          const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as OtpType });
           if (!error) return router.replace('/org/new');
         }
 

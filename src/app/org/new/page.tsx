@@ -3,9 +3,11 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 
+type OrgType = 'artist' | 'label';
+
 export default function NewOrg() {
   const [name, setName] = useState('');
-  const [type, setType] = useState<'artist'|'label'>('artist');
+  const [type, setType] = useState<OrgType>('artist');
   const [err, setErr] = useState<string|null>(null);
   const router = useRouter();
 
@@ -47,7 +49,7 @@ export default function NewOrg() {
         <select
           className="w-full border p-2 rounded"
           value={type}
-          onChange={(e)=>setType(e.target.value as any)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setType(e.target.value as OrgType)}
         >
           <option value="artist">Artist</option>
           <option value="label">Label</option>

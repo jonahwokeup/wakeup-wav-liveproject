@@ -1,16 +1,27 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+"use client";
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
 import { getActiveOrg } from '@/lib/org';
 import { Card, CardTitle } from '@/components/ui/Card';
+import ArtworkPicker, { useArtworkUpload } from "@/components/ArtworkPicker";
+import { uploadArtworkToBucket } from "@/lib/storage";
 
 type ReleaseType = 'single' | 'ep' | 'album';
+
+export const dynamic = 'force-dynamic';
 
 export default function NewRelease() {
   const router = useRouter();
   const [orgId, setOrgId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  
+  // Read ?org=<id> from URL (or however you already pass org context)
+  const orgIdFromUrl = searchParams.get("org");
+
+  // Artwork state (file + preview)
+  const art = useArtworkUpload();
 
   // Release fields
   const [title, setTitle] = useState('');
@@ -46,12 +57,16 @@ export default function NewRelease() {
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const org = await getActiveOrg();
-      setOrgId(org?.id ?? null);
-    })();
-  }, []);
+          useEffect(() => {
+          (async () => {
+            if (orgIdFromUrl) {
+              setOrgId(orgIdFromUrl);
+              return;
+            }
+            const org = await getActiveOrg();
+            setOrgId(org?.id ?? null);
+          })();
+        }, [orgIdFromUrl]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,39 +77,57 @@ export default function NewRelease() {
 
     setSaving(true);
 
-    const { error } = await supabase.from('releases').insert({
-      org_id: orgId,
-      title,
-      display_title: displayTitle || null,
-      release_type: releaseType,
-      release_date: releaseDate || null,
-      upc: upc || null,
-      catalog_number: catalogNumber || null,
-      grid: grid || null,
-      primary_genre: primaryGenre || null,
-      sub_genre: subGenre || null,
-      metadata_language: metadataLanguage || null,
-      audio_language: audioLanguage || null,
-      audio_presentation: audioPresentation || null,
-      release_artists: releaseArtists || null,
-      contributors: contributors || null,
-      c_line_year: cLineYear ? parseInt(cLineYear, 10) : null,
-      c_line_owner: cLineOwner || null,
-      p_line_year: pLineYear ? parseInt(pLineYear, 10) : null,
-      p_line_owner: pLineOwner || null,
-      marketing_notes: marketingNotes || null,
-    });
+    try {
+      // A) Just BEFORE your supabase insert/update call, add:
+      let coverUrl: string | null = null;
+      if (art.file && orgId) {
+        coverUrl = await uploadArtworkToBucket(art.file, orgId);
+      }
 
-    if (error) {
+      const { error } = await supabase
+        .from("releases")
+        .insert([
+          {
+            // ...your other fields (title, release_date, release_type, etc.)
+            org_id: orgId,
+            title,
+            display_title: displayTitle || null,
+            release_type: releaseType,
+            release_date: releaseDate || null,
+            upc: upc || null,
+            catalog_number: catalogNumber || null,
+            grid: grid || null,
+            primary_genre: primaryGenre || null,
+            sub_genre: subGenre || null,
+            metadata_language: metadataLanguage || null,
+            audio_language: audioLanguage || null,
+            audio_presentation: audioPresentation || null,
+            release_artists: releaseArtists || null,
+            contributors: contributors || null,
+            c_line_year: cLineYear ? parseInt(cLineYear, 10) : null,
+            c_line_owner: cLineOwner || null,
+            p_line_year: pLineYear ? parseInt(pLineYear, 10) : null,
+            p_line_owner: pLineOwner || null,
+            marketing_notes: marketingNotes || null,
+            cover_url: coverUrl,
+          }
+        ]);
+
+      if (error) {
+        setSaving(false);
+        return setErr(error.message);
+      }
+
+      router.push('/dashboard');
+    } catch {
       setSaving(false);
-      return setErr(error.message);
+      setErr('An unexpected error occurred. Please try again.');
     }
-
-    router.push('/dashboard');
   }
 
   return (
-    <main className="min-h-screen p-6 space-y-6">
+    <Suspense fallback={null}>
+      <main className="min-h-screen p-6 space-y-6">
       <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 bg-clip-text text-transparent">
         Create Release
       </h1>
@@ -204,6 +237,14 @@ export default function NewRelease() {
 
         {err && <p className="text-red-500 text-sm">{err}</p>}
 
+        <ArtworkPicker
+          label="Cover Image"
+          file={art.file}
+          previewUrl={art.previewUrl}
+          onFile={art.setArtwork}
+          onClear={art.reset}
+        />
+
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save Release'}
@@ -211,6 +252,7 @@ export default function NewRelease() {
           <Button type="button" variant="ghost" onClick={()=>router.back()}>Cancel</Button>
         </div>
       </form>
-    </main>
+      </main>
+    </Suspense>
   );
 }

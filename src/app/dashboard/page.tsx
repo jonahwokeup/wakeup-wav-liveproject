@@ -1,93 +1,100 @@
-'use client';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Card, CardTitle, CardText } from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import { supabase } from '@/lib/supabaseClient';
-import { getActiveOrg } from '@/lib/org';
+"use client";
+import React, { useMemo } from "react";
+import Sparkline from "@/components/Sparkline";
+import Link from "next/link";
 
-type Release = { id: string; title: string; release_date: string | null; created_at: string };
+// Simple deterministic mock so it looks stable between reloads
+function mockSeries(len = 24, seed = 42, base = 1000, volatility = 0.06) {
+  let x = base;
+  const out: number[] = [];
+  let s = seed;
+  for (let i = 0; i < len; i++) {
+    // tiny LCG
+    s = (s * 1664525 + 1013904223) % 2 ** 32;
+    const r = ((s >>> 16) / 65535) * 2 - 1; // [-1,1]
+    x = Math.max(0, x * (1 + r * volatility));
+    out.push(Math.round(x));
+  }
+  return out;
+}
 
-export default function Dashboard() {
-  const [orgName, setOrgName] = useState<string | null>(null);
-  const [releases, setReleases] = useState<Release[]>([]);
-  const [loading, setLoading] = useState(true);
+export const dynamic = 'force-dynamic';
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const org = await getActiveOrg();
-      if (!org) {
-        setOrgName(null);
-        setReleases([]);
-        setLoading(false);
-        return;
-      }
-      setOrgName(org.name);
-
-      const { data } = await supabase
-        .from('releases')
-        .select('*')
-        .eq('org_id', org.id)
-        .order('created_at', { ascending: false });
-
-      setReleases(data ?? []);
-      
-      // fetch track counts for each release and inject into DOM placeholders
-      if (data && data.length) {
-        const ids = data.map(d => d.id);
-        const { data: counts } = await supabase
-          .from('tracks')
-          .select('release_id, id')
-          .in('release_id', ids);
-
-        const byRelease = new Map<string, number>();
-        counts?.forEach(t => {
-          byRelease.set(t.release_id, (byRelease.get(t.release_id) ?? 0) + 1);
-        });
-
-        // naive client-side write into placeholders (we'll render properly later)
-        requestAnimationFrame(() => {
-          ids.forEach(id => {
-            const el = document.querySelector(`[data-rel="${id}"]`);
-            if (el) el.textContent = String(byRelease.get(id) ?? 0);
-          });
-        });
-      }
-      
-      setLoading(false);
-    })();
-  }, []);
+export default function DashboardPage() {
+  const streams = useMemo(() => mockSeries(28, 7, 1200, 0.08), []);
+  const ads = useMemo(() => mockSeries(28, 11, 300, 0.12), []);
+  const growthPct = useMemo(() => {
+    if (streams.length < 2) return 0;
+    const a = streams[streams.length - 2];
+    const b = streams[streams.length - 1];
+    return ((b - a) / Math.max(1, a)) * 100;
+  }, [streams]);
 
   return (
-    <main className="p-6 space-y-4">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 bg-clip-text text-transparent">
-          Dashboard{orgName ? ` — ${orgName}` : ''}
-        </h1>
-        <Link href="/releases/new"><Button>Create Release</Button></Link>
+        <h1 className="text-2xl font-semibold">Data Dashboard</h1>
+        <div className="text-sm text-zinc-400">
+          Mock data for layout only — replace with live metrics later
+        </div>
       </div>
 
-      {loading && <Card><CardText>Loading releases…</CardText></Card>}
+      {/* Overview tiles */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="card">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-zinc-400">Total Streams</div>
+              <div className="mt-1 text-2xl font-semibold">
+                {streams[streams.length - 1].toLocaleString()}
+              </div>
+              <div className={`mt-1 text-xs ${growthPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {growthPct >= 0 ? "▲" : "▼"} {growthPct.toFixed(1)}% vs prev day
+              </div>
+            </div>
+            <Sparkline data={streams} width={180} height={48} />
+          </div>
+          <div className="mt-3 text-xs text-zinc-400">Last 28 days</div>
+        </div>
 
-      {!loading && releases.length === 0 && (
-        <Card>
-          <CardTitle>No releases yet</CardTitle>
-          <CardText>Create your first release to get started.</CardText>
-          <div className="mt-3"><Link href="/releases/new"><Button>New release</Button></Link></div>
-        </Card>
-      )}
+        <div className="card">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-zinc-400">Ad Clicks</div>
+              <div className="mt-1 text-2xl font-semibold">
+                {ads[ads.length - 1].toLocaleString()}
+              </div>
+            </div>
+            <Sparkline data={ads} width={180} height={48} showArea />
+          </div>
+          <div className="mt-3 text-xs text-zinc-400">Last 28 days</div>
+        </div>
 
-      <div className="grid gap-3">
-        {releases.map(r => (
-          <Card key={r.id}>
-            <CardTitle>{r.title}</CardTitle>
-            <CardText>
-              {r.release_date ? `Release date: ${r.release_date}` : 'No date set'}
-            </CardText>
-          </Card>
-        ))}
+        <div className="card">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-zinc-400">Actions Triggered</div>
+              <div className="mt-1 text-2xl font-semibold">42</div>
+            </div>
+            <Sparkline data={mockSeries(28, 19, 40, 0.2)} width={180} height={48} />
+          </div>
+          <div className="mt-3 text-xs text-zinc-400">
+            Placeholder — we&apos;ll wire to real &quot;AI action layer&quot; later
+          </div>
+        </div>
       </div>
-    </main>
+
+      {/* Quick links */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link href="/dashboard/streaming" className="card hover:bg-zinc-900/40 transition-colors">
+          <div className="text-lg font-semibold">Streaming</div>
+          <div className="mt-1 text-sm text-zinc-400">Platform breakdown, territories, velocity</div>
+        </Link>
+        <Link href="/dashboard/ads" className="card hover:bg-zinc-900/40 transition-colors">
+          <div className="text-lg font-semibold">Ads</div>
+          <div className="mt-1 text-sm text-zinc-400">Spend, CTR, ROAS, cohorts</div>
+        </Link>
+      </div>
+    </div>
   );
 }

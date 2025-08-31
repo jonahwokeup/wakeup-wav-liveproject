@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 
 type OrgType = 'artist' | 'label';
 
+export const dynamic = 'force-dynamic';
+
 export default function NewOrg() {
   const [name, setName] = useState('');
   const [type, setType] = useState<OrgType>('artist');

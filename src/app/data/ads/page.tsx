@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 export default function Ads() {
   return (
     <main className="p-4 md:p-6">

@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import './globals.css'
 import HoloText from '@/components/HoloText'
 import MascotClock from '@/components/MascotClock'
 import { swomp } from '@/app/fonts/swomp'
 import AuthStatus from '@/components/AuthStatus'
 import Sidebar from '@/components/Sidebar'
+
 
 export const metadata: Metadata = {
   title: 'wakeup.wav',
@@ -15,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="bg-black text-zinc-100">
+
         <div className="flex min-h-screen">
           <Sidebar />
           <div className="flex-1">
@@ -29,7 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </header>
             <AuthStatus />
-            {children}
+            <Suspense fallback={null}>
+              {children}
+            </Suspense>
           </div>
         </div>
       </body>

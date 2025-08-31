@@ -1,15 +1,15 @@
-'use client';
-import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function SignInPage() {
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const [err, setErr] = useState<string|null>(null);
+export default async function SignInPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const errorParam = params?.error;
+  const error = Array.isArray(errorParam) ? errorParam[0] : errorParam;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
+    const formData = new FormData(e.target as HTMLFormElement);
+    const email = formData.get('email') as string;
+    
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -18,7 +18,18 @@ export default function SignInPage() {
           : undefined,
       },
     });
-    if (error) setErr(error.message); else setSent(true);
+    
+    if (error) {
+      // Redirect with error
+      const url = new URL(window.location.href);
+      url.searchParams.set('error', error.message);
+      window.location.href = url.toString();
+    } else {
+      // Redirect with success
+      const url = new URL(window.location.href);
+      url.searchParams.set('message', 'Check your email for the link');
+      window.location.href = url.toString();
+    }
   }
 
   return (
@@ -28,16 +39,15 @@ export default function SignInPage() {
         <input
           className="w-full border p-2 rounded"
           type="email"
+          name="email"
           placeholder="you@example.com"
-          value={email}
-          onChange={(e)=>setEmail(e.target.value)}
           required
         />
         <button className="w-full border p-2 rounded" type="submit">
           Send magic link
         </button>
-        {sent && <p className="text-green-700">Check your email for the link.</p>}
-        {err && <p className="text-red-600">{err}</p>}
+        {params?.message && <p className="text-green-700">{params.message}</p>}
+        {error && <p className="text-red-600">{error}</p>}
       </form>
     </main>
   );

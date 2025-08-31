@@ -55,7 +55,7 @@ function CallbackInner() {
         // If none worked, go back to signin
         router.replace('/signin?error=auth');
       } catch {
-        router.replace('/signin?error/auth');
+        router.replace('/signin?error=auth');
       }
     })();
   }, [router, searchParams]);

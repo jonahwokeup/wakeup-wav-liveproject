@@ -47,3 +47,7 @@ body {
 .float-slow {
   animation: float-slow 6s ease-in-out infinite;
 }
+
+.card {
+  @apply rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4;
+}
